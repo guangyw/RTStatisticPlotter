@@ -1,0 +1,10 @@
+This is only a proto type of our project. 
+It is not fully functional yet.
+
+
+Run server.py first to start the server
+Then run test_client.py. It is a dummy data generator that connected to the server to test the system.
+Whenever a client connected, the server will display what clients are connected right now, and let the user choose which stream to display
+The user entered a num, and a stream of data whose client index in the memory of server, will be displayed
+
+
