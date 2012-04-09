@@ -27,7 +27,7 @@ from matplotlib.backends.backend_wxagg import \
     FigureCanvasWxAgg as FigCanvas, \
     NavigationToolbar2WxAgg as NavigationToolbar
 import numpy as np
-import pylab
+import matplotlib.pyplot as plt
 
 import time
 
@@ -43,7 +43,7 @@ class DataGen(object):
         self.index = index
         
     def next(self):
-		print self.dataToDisplay;
+		#print self.dataToDisplay;
 		self.keys = self.dataToDisplay.keys()
 		if (str(self.index) in self.keys):
 			self.data = self.dataToDisplay.get(str(self.index))
@@ -155,7 +155,12 @@ class GraphFrame(wx.Frame):
         self.index = index
         self.addr = addr
         self.datagen = DataGen(dataToDisplay, index, 0)
-        self.data = [self.datagen.next()]
+        self.data = [self.datagen.next()]        
+        self.ave = float(self.data[0])
+        self.data_total = self.ave
+        self.min = self.ave
+        self.max = self.ave
+        #print self.data
         self.paused = False
         
         self.create_menu()
@@ -164,7 +169,7 @@ class GraphFrame(wx.Frame):
         
         self.redraw_timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.on_redraw_timer, self.redraw_timer)        
-        self.redraw_timer.Start(100)
+        self.redraw_timer.Start(200)
 
     def create_menu(self):
         self.menubar = wx.MenuBar()
@@ -227,6 +232,8 @@ class GraphFrame(wx.Frame):
         self.vbox.Add(self.hbox1, 0, flag=wx.ALIGN_LEFT | wx.TOP)
         self.vbox.Add(self.hbox2, 0, flag=wx.ALIGN_LEFT | wx.TOP)
         
+        DataCursor(self.plot_data)
+       
         self.panel.SetSizer(self.vbox)
         self.vbox.Fit(self)
     
@@ -238,19 +245,19 @@ class GraphFrame(wx.Frame):
         self.fig = Figure((3.0, 3.0), dpi=self.dpi)
 
         self.axes = self.fig.add_subplot(111)
-        self.axes.set_axis_bgcolor('black')
+        self.axes.set_axis_bgcolor('white')
         self.axes.set_title('Data from client %s' % self.addr, size=12)
         
-        pylab.setp(self.axes.get_xticklabels(), fontsize=8)
-        pylab.setp(self.axes.get_yticklabels(), fontsize=8)
+        plt.setp(self.axes.get_xticklabels(), fontsize=8)
+        plt.setp(self.axes.get_yticklabels(), fontsize=8)
 
         # plot the data as a line series, and save the reference 
         # to the plotted line series
         #
         self.plot_data = self.axes.plot(
-            self.data, 
+            self.data[0], 
             linewidth=1,
-            color=(1, 1, 0),
+            color=(0, 0, 0),
             )[0]
 
     def draw_plot(self):
@@ -303,11 +310,16 @@ class GraphFrame(wx.Frame):
         # returns a list over which one needs to explicitly 
         # iterate, and setp already handles this.
         #  
-        pylab.setp(self.axes.get_xticklabels(), 
+        plt.setp(self.axes.get_xticklabels(), 
             visible=self.cb_xlab.IsChecked())
         
         self.plot_data.set_xdata(np.arange(len(self.data)))
         self.plot_data.set_ydata(np.array(self.data))
+        
+        self.statics_display.static_text_ave.SetLabel(str(self.ave))
+        self.statics_display.static_text_min.SetLabel(str(self.min))
+        self.statics_display.static_text_max.SetLabel(str(self.max))
+        #DataCursor(self.plot_data)
         
         self.canvas.draw()
     
@@ -345,9 +357,15 @@ class GraphFrame(wx.Frame):
         # (to respond to scale modifications, grid change, etc.)
         #
         if not self.paused:
-            self.data.append(self.datagen.next())
-        
-        self.draw_plot()
+			self.data_next = float(self.datagen.next())
+			self.data.append(self.data_next)
+			self.data_total = self.data_total + self.data_next
+			self.ave = self.data_total/len(self.data)
+			if (self.data_next<self.min):
+				self.min = self.data_next
+			if (self.data_next>self.max):
+				self.max = self.data_next
+			self.draw_plot()
     
     def on_exit(self, event):
         self.Destroy()
@@ -360,9 +378,75 @@ class GraphFrame(wx.Frame):
             self.on_flash_status_off, 
             self.timeroff)
         self.timeroff.Start(flash_len_ms, oneShot=True)
-    
-    def on_flash_status_off(self, event):
-        self.statusbar.SetStatusText('')
+	def on_flash_status_off(self, event):
+		self.statusbar.SetStatusText('')
+        
+from matplotlib import cbook
+
+class DataCursor(object):
+    """A simple data cursor widget that displays the x,y location of a
+    matplotlib artist when it is selected."""
+    def __init__(self, artists, tolerance=5, offsets=(-20, 20), 
+                 template='x: %0.2f\ny: %0.2f', display_all=False):
+        """Create the data cursor and connect it to the relevant figure.
+        "artists" is the matplotlib artist or sequence of artists that will be 
+            selected. 
+        "tolerance" is the radius (in points) that the mouse click must be
+            within to select the artist.
+        "offsets" is a tuple of (x,y) offsets in points from the selected
+            point to the displayed annotation box
+        "template" is the format string to be used. Note: For compatibility
+            with older versions of python, this uses the old-style (%) 
+            formatting specification.
+        "display_all" controls whether more than one annotation box will
+            be shown if there are multiple axes.  Only one will be shown
+            per-axis, regardless. 
+        """
+        self.template = template
+        self.offsets = offsets
+        self.display_all = display_all
+        if not cbook.iterable(artists):
+            artists = [artists]
+        self.artists = artists
+        self.axes = tuple(set(art.axes for art in self.artists))
+        self.figures = tuple(set(ax.figure for ax in self.axes))
+
+        self.annotations = {}
+        for ax in self.axes:
+            self.annotations[ax] = self.annotate(ax)
+
+        for artist in self.artists:
+            artist.set_picker(tolerance)
+        for fig in self.figures:
+            fig.canvas.mpl_connect('pick_event', self)
+
+    def annotate(self, ax):
+        """Draws and hides the annotation box for the given axis "ax"."""
+        annotation = ax.annotate(self.template, xy=(0, 0), ha='right',
+                xytext=self.offsets, textcoords='offset points', va='bottom',
+                bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+                arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0')
+                )
+        annotation.set_visible(False)
+        return annotation
+
+    def __call__(self, event):
+        """Intended to be called through "mpl_connect"."""
+        # Rather than trying to interpolate, just display the clicked coords
+        # This will only be called if it's within "tolerance", anyway.
+        x, y = event.mouseevent.xdata, event.mouseevent.ydata
+        annotation = self.annotations[event.artist.axes]
+        if x is not None:
+            #if not self.display_all:
+                # Hide any other annotation boxes...
+            #    for ann in self.annotations.values():
+            #        ann.set_visible(False)
+            # Update the annotation in the current axis..
+            annotation.xy = x, y
+            annotation.set_text(self.template % (x, y))
+            annotation.set_visible(True)
+            #event.canvas.draw()
+
 	
 #def startPlotting(dataToDisplay):
 def startPlotting(*args):

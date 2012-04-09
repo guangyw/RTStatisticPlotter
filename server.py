@@ -34,7 +34,7 @@ class serverProtocol(Protocol):
 		double_data = float(data)
 		self.factory.outputData(double_data, self.addr)
 	def connectionLost(self, reason):
-		self.factory.receiving_finished()
+		self.factory.receiving_finished(self.addr)
 		
 class serverFactory(ServerFactory):
 	addresses = []
@@ -57,18 +57,27 @@ class serverFactory(ServerFactory):
 	def choose_to_display(self):
 		print 'There are %d clients connected:' % len(self.addresses)
 		for address in self.addresses:
-			print '    '+str(self.addresses.index(address)) + ': ' + address
-		choice = int(raw_input('choose the stream of data to display:  '))
+			print ' #'+str(self.addresses.index(address)) + ': ' + address
+		choice = raw_input('choose the stream of data to display:  ')
+		try:
+			choice = int(choice)
+		except ValueError:
+			choice =int(raw_input('Please entry a valid number: '))
+			
 		while (choice >= len(self.addresses)):			
 			choice = int(raw_input('No stream with index %d, please choose again :  ' % choice))
 		print 'starting print thread: %s' % self.addresses[choice]
 		reactor.callInThread(matplotter.startPlotting, self.dataToDisplay, self.addresses.index(address), address)
 		
+			
+		
 	def outputData(self, data, addr):
 		self.data_getTime = datetime.datetime.now()
 		#print self.data_getTime
 		self.time_diff = self.data_getTime - self.start_time
-		#print self.time_diff
+#		print self.time_diff.microseconds/50000
+		#self.time_d = self.time_diff[1]
+		#print self.time_d
 		self.index = self.addresses.index(addr)
 		self.dataTuple = self.time_diff, self.addresses.index(addr), data
 		#print self.dataTuple
@@ -76,8 +85,9 @@ class serverFactory(ServerFactory):
 		#print self.dataToDisplay		
 #		self.startPlotterThread(addr)
 		
-	def receiving_finished(self):
-		pass
+	def receiving_finished(self, addr):
+		print 'Stream from %s closed' % addr
+		self.addresses.remove(addr)
 		
 		
 		

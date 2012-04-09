@@ -1,10 +1,25 @@
-This is only a proto type of our project. 
-It is not fully functional yet.
+Right now the server can only be run on Linux.
+The plotter uses matplotlib. So, numpy and matplotlib need to be installed.
 
+Suggested way to install matplotlib and numpy:
+
+sudo apt-get install python-numpy python-matplotlib
+
+The server is written in Twisted python. So, twisted python should be installed.
+
+The test client is just a simple socket program. It is a dummy data generator that connected to the server to test the system. It is cross-platform.
 
 Run server.py first to start the server
 Then run test_client.py. It is a dummy data generator that connected to the server to test the system.
 Whenever a client connected, the server will display what clients are connected right now, and let the user choose which stream to display
-The user entered a num, and a stream of data whose client index in the memory of server, will be displayed
+The user entered a num, and a stream of data whose client index in the memory of server, will be displayed.
+
+In the Display window, click on any point of the graph to find out the exact x, y value of that point.
+
+Average, minimum, maximum values of this stream are displayed in the right bottom corner.
+
+You can change the display canvass to the way you like, by setting the max and min value of x and y axises.
+
+You can save the current canvass to file.
 
 
